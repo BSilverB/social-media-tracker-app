@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "18907043608",
+    "firebase_url": "https://mindful-tracker-bc869-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "mindful-tracker-bc869",
+    "storage_bucket": "mindful-tracker-bc869.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:18907043608:android:828fa5cf7272e711e9f06d",
+        "android_client_info": {
+          "package_name": "com.example.social_media_tracker_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "YOUR_FIREBASE_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
