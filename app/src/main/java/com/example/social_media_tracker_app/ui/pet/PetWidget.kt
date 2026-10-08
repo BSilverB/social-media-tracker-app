@@ -161,9 +161,12 @@ fun PetWidget(
             }
         } else if (petState.mode == "puppet") {
             // Puppet Mode
-            val moodColor = when (petState.mood) {
-                "happy" -> Color(0xFF10B981)
-                "neutral" -> Color(0xFFF59E0B)
+            val moodColor = when {
+                petState.isWilted -> Color(0xFFD97706)
+                petState.computedEvolutionStage == "flowering" -> Color(0xFFFBBF24)
+                petState.computedEvolutionStage == "growing" -> Color(0xFF10B981)
+                petState.mood == "happy" -> Color(0xFF10B981)
+                petState.mood == "neutral" -> Color(0xFFF59E0B)
                 else -> Color(0xFFEF4444)
             }
 
@@ -172,7 +175,11 @@ fun PetWidget(
                     .size(36.dp)
                     .offset(y = bounceY.dp)
                     .clip(CircleShape)
-                    .border(2.dp, moodColor, CircleShape)
+                    .border(
+                        width = if (petState.computedEvolutionStage == "flowering") 2.5.dp else 2.dp,
+                        color = moodColor,
+                        shape = CircleShape
+                    )
                     .clickable {
                         val (msg, gained) = onPoke()
                         bubbleText = msg
@@ -189,9 +196,10 @@ fun PetWidget(
                     )
                 } else {
                     // Fallback puppet emoji based on mood
-                    val emoji = when (petState.mood) {
-                        "happy" -> "🥰"
-                        "neutral" -> "😐"
+                    val emoji = when {
+                        petState.isWilted -> "🥀"
+                        petState.mood == "happy" -> "🥰"
+                        petState.mood == "neutral" -> "😐"
                         else -> "😢"
                     }
                     Text(text = emoji, fontSize = 20.sp)
@@ -216,10 +224,20 @@ fun PetWidget(
                     val center = Offset(w / 2f, h / 2f)
 
                     // 1. Sprout Body
-                    val bodyColor = when (petState.mood) {
-                        "happy" -> Color(0xFF10B981)
-                        "neutral" -> Color(0xFF34D399)
+                    val bodyColor = when {
+                        petState.isWilted -> Color(0xFF78716C) // Withered grayish
+                        petState.mood == "happy" -> Color(0xFF10B981)
+                        petState.mood == "neutral" -> Color(0xFF34D399)
                         else -> Color(0xFF64748B) // Sad
+                    }
+
+                    // Optional flowering aura
+                    if (petState.computedEvolutionStage == "flowering") {
+                        drawCircle(
+                            color = Color(0x33FBBF24),
+                            radius = w * 0.48f,
+                            center = center
+                        )
                     }
 
                     drawCircle(
@@ -233,18 +251,26 @@ fun PetWidget(
                     )
 
                     // Sprout Stem & Leaf
+                    val stemColor = if (petState.isWilted) Color(0xFF854D0E) else bodyColor
                     val stemPath = Path().apply {
                         moveTo(center.x, center.y - h * 0.35f)
                         quadraticTo(center.x - 4f, center.y - h * 0.55f, center.x - 8f, center.y - h * 0.65f)
                     }
-                    drawPath(stemPath, color = bodyColor, style = Stroke(width = 3f))
+                    drawPath(stemPath, color = stemColor, style = Stroke(width = 3f))
 
+                    val leafColor = if (petState.isWilted) Color(0xFFCA8A04) else Color(0xFF22C55E)
                     val leafPath = Path().apply {
                         moveTo(center.x - 8f, center.y - h * 0.65f)
                         quadraticTo(center.x - 14f, center.y - h * 0.75f, center.x - 4f, center.y - h * 0.8f)
                         quadraticTo(center.x - 2f, center.y - h * 0.7f, center.x - 8f, center.y - h * 0.65f)
                     }
-                    drawPath(leafPath, color = Color(0xFF22C55E), style = Fill)
+                    drawPath(leafPath, color = leafColor, style = Fill)
+
+                    // Flowering Blossom (Day 21+)
+                    if (petState.computedEvolutionStage == "flowering" && !petState.isWilted) {
+                        drawCircle(Color(0xFFF43F5E), radius = 3.5f, center = Offset(center.x - 7f, center.y - h * 0.72f))
+                        drawCircle(Color(0xFFFBBF24), radius = 2f, center = Offset(center.x - 7f, center.y - h * 0.72f))
+                    }
 
                     // 2. Eyes & Facial Expression
                     val eyeY = center.y - 2f

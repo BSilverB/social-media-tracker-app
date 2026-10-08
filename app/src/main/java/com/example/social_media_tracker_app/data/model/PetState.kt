@@ -157,10 +157,21 @@ data class PetState(
     val mode: String = "default", // "default" | "puppet" | "ai_generated"
     val puppetPhotos: PuppetPhotos = PuppetPhotos(),
     val aiSprites: AiSprites = AiSprites(),
-    val userPersona: UserPersonaData = UserPersonaData()
+    val userPersona: UserPersonaData = UserPersonaData(),
+    val knowledgeSeeds: Int = 0,
+    val customQuotes: List<String> = emptyList(),
+    val isWilted: Boolean = false,
+    val evolutionStage: String = "seedling"
 ) {
     val isDisappeared: Boolean
         get() = energy <= 0
+
+    val computedEvolutionStage: String
+        get() = when {
+            streakDays >= 21 -> "flowering"
+            streakDays >= 4 -> "growing"
+            else -> "seedling"
+        }
 
     fun getActivePuppetImagePath(): String? {
         if (mode != "puppet" || isDisappeared) return null
@@ -214,6 +225,15 @@ data class PetState(
                 val aiSprites = AiSprites.fromJson(obj.optJSONObject("aiSprites"))
                 val userPersona = UserPersonaData.fromJson(obj.optJSONObject("userPersona"))
 
+                val knowledgeSeeds = obj.optInt("knowledgeSeeds", 0)
+                val customQuotes = mutableListOf<String>()
+                val quotesArr = obj.optJSONArray("customQuotes")
+                if (quotesArr != null) {
+                    for (i in 0 until quotesArr.length()) customQuotes.add(quotesArr.getString(i))
+                }
+                val isWilted = obj.optBoolean("isWilted", false)
+                val stage = obj.optString("evolutionStage", if (streak >= 21) "flowering" else if (streak >= 4) "growing" else "seedling")
+
                 PetState(
                     energy = energy,
                     mood = calculateMood(energy),
@@ -225,7 +245,11 @@ data class PetState(
                     mode = obj.optString("mode", "default"),
                     puppetPhotos = puppetPhotos,
                     aiSprites = aiSprites,
-                    userPersona = userPersona
+                    userPersona = userPersona,
+                    knowledgeSeeds = knowledgeSeeds,
+                    customQuotes = customQuotes,
+                    isWilted = isWilted,
+                    evolutionStage = stage
                 )
             } catch (e: Exception) {
                 PetState()
@@ -245,6 +269,13 @@ data class PetState(
         obj.put("puppetPhotos", puppetPhotos.toJson())
         obj.put("aiSprites", aiSprites.toJson())
         obj.put("userPersona", userPersona.toJson())
+        obj.put("knowledgeSeeds", knowledgeSeeds)
+
+        val quotesArr = JSONArray()
+        customQuotes.forEach { quotesArr.put(it) }
+        obj.put("customQuotes", quotesArr)
+        obj.put("isWilted", isWilted)
+        obj.put("evolutionStage", evolutionStage.ifEmpty { computedEvolutionStage })
 
         val accObj = JSONObject()
         val unlockedArr = JSONArray()

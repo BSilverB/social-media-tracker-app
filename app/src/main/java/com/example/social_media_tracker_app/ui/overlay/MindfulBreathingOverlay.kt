@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.social_media_tracker_app.data.model.PetState
 import kotlinx.coroutines.delay
 
 @Composable
@@ -51,6 +52,7 @@ fun MindfulBreathingOverlay(
     masterGoal: String = "Muốn trở thành phiên bản tốt hơn",
     currentSwipes: Int,
     threshold: Int = 45,
+    petState: PetState? = null,
     onDismiss: () -> Unit,
     onCloseApp: () -> Unit,
     onResistTemptation: (() -> Unit)? = null,
@@ -177,26 +179,54 @@ fun MindfulBreathingOverlay(
                     trackColor = Color(0x22FFFFFF),
                 )
 
-                // Animated breathing orb
+                // Animated breathing orb (Pet embraces the breathing orb synchronously)
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(96.dp)
                         .scale(if (isComplete) 1f else pulseScale)
-                        .shadow(16.dp, CircleShape, spotColor = phaseColor)
+                        .shadow(20.dp, CircleShape, spotColor = phaseColor)
                         .clip(CircleShape)
                         .background(
                             Brush.radialGradient(
-                                colors = listOf(phaseColor, phaseColor.copy(alpha = 0.3f))
+                                colors = listOf(phaseColor.copy(alpha = 0.85f), phaseColor.copy(alpha = 0.25f))
                             )
                         )
+                        .border(2.dp, phaseColor.copy(alpha = 0.6f), CircleShape)
                 ) {
-                    Text(
-                        text = if (isComplete) "✓" else "${totalDurationSeconds - elapsedSeconds}s",
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Black
-                    )
+                    if (petState != null) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            val petEmoji = when {
+                                petState.isWilted -> "🥀"
+                                petState.mode == "puppet" -> "🧸"
+                                petState.mode == "ai_generated" -> "✨"
+                                petState.computedEvolutionStage == "flowering" -> "🌸"
+                                petState.computedEvolutionStage == "growing" -> "🌿"
+                                else -> "🌱"
+                            }
+                            Text(
+                                text = petEmoji,
+                                fontSize = 30.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isComplete) "✓ Tốt lắm" else "${totalDurationSeconds - elapsedSeconds}s",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = if (isComplete) "✓" else "${totalDurationSeconds - elapsedSeconds}s",
+                            color = Color.White,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
                 }
             }
 

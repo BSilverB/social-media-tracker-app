@@ -94,9 +94,11 @@ object GeminiCoachService {
                 1. Đưa ra phản hồi ngắn gọn (dưới 100 từ), thấu cảm, đánh giá xem ngày hôm nay người dùng có đang bám sát mục tiêu lớn không và giao 1 nhiệm vụ nhỏ cụ thể cho ngày mai.
                 2. Nếu có danh sách video CHƯA RÕ PHÂN LOẠI ở trên, hãy đọc hiểu tiêu đề/kênh và phân loại từng video vào 1 trong 3 nhóm: "goal", "leisure", hoặc "distraction".
                 3. Đề xuất từ 1 đến 4 TỪ KHÓA MỚI (hoặc tên kênh/thuật ngữ tiêu biểu) được phát hiện từ các video trên để cập nhật vào bộ lọc máy cho ngày mai:
-                   - learnedTargetKeywords: từ khóa nội dung phục vụ mục tiêu lớn
-                   - learnedLeisureKeywords: từ khóa nội dung giải trí lành mạnh
-                   - learnedDistractionKeywords: từ khóa bẫy dopamine / drama / hài nhảm
+                   - "keywords": danh sách các từ khóa mới phát hiện, mỗi từ gồm:
+                     * "word": từ khóa bằng chữ thường
+                     * "category": "target" (nội dung phục vụ mục tiêu), "leisure" (giải trí lành mạnh), hoặc "distraction" (bẫy dopamine / drama / hài nhảm)
+                     * "confidence": độ tin cậy từ 50 đến 100
+                     * "reason": lý do ngắn gọn dưới 12 từ
 
                 Định dạng trả về JSON bắt buộc:
                 {
@@ -105,9 +107,14 @@ object GeminiCoachService {
                   "reclassifiedVideos": [
                     {"id": "id_hoac_title_video", "category": "goal|leisure|distraction"}
                   ],
-                  "learnedTargetKeywords": ["từ khóa 1"],
-                  "learnedLeisureKeywords": ["từ khóa 2"],
-                  "learnedDistractionKeywords": ["từ khóa 3"]
+                  "keywords": [
+                    {
+                      "word": "từ khóa 1",
+                      "category": "target|leisure|distraction",
+                      "confidence": 85,
+                      "reason": "Lý do ngắn gọn"
+                    }
+                  ]
                 }
             """.trimIndent()
 
@@ -163,29 +170,50 @@ object GeminiCoachService {
                     }
 
                     val learnedTarget = mutableListOf<String>()
+                    val learnedLeisure = mutableListOf<String>()
+                    val learnedDistraction = mutableListOf<String>()
+
+                    // 1. Chuẩn hóa mới: Đọc từ mảng keywords chung với category
+                    if (parsed.has("keywords")) {
+                        val arr = parsed.getJSONArray("keywords")
+                        for (i in 0 until arr.length()) {
+                            val item = arr.getJSONObject(i)
+                            val kw = item.optString("word", "").trim().lowercase()
+                            var cat = item.optString("category", "target").trim().lowercase()
+                            if (cat == "goal") cat = "target"
+                            if (kw.isNotBlank()) {
+                                when (cat) {
+                                    "target" -> if (!learnedTarget.contains(kw)) learnedTarget.add(kw)
+                                    "leisure" -> if (!learnedLeisure.contains(kw)) learnedLeisure.add(kw)
+                                    "distraction" -> if (!learnedDistraction.contains(kw)) learnedDistraction.add(kw)
+                                    else -> if (!learnedTarget.contains(kw)) learnedTarget.add(kw)
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Fallback cấu trúc cũ (nếu AI trả về 3 mảng riêng lẻ)
                     if (parsed.has("learnedTargetKeywords")) {
                         val arr = parsed.getJSONArray("learnedTargetKeywords")
                         for (i in 0 until arr.length()) {
-                            val kw = arr.getString(i).trim()
-                            if (kw.isNotBlank()) learnedTarget.add(kw)
+                            val kw = arr.getString(i).trim().lowercase()
+                            if (kw.isNotBlank() && !learnedTarget.contains(kw)) learnedTarget.add(kw)
                         }
                     }
 
-                    val learnedLeisure = mutableListOf<String>()
                     if (parsed.has("learnedLeisureKeywords")) {
                         val arr = parsed.getJSONArray("learnedLeisureKeywords")
                         for (i in 0 until arr.length()) {
-                            val kw = arr.getString(i).trim()
-                            if (kw.isNotBlank()) learnedLeisure.add(kw)
+                            val kw = arr.getString(i).trim().lowercase()
+                            if (kw.isNotBlank() && !learnedLeisure.contains(kw)) learnedLeisure.add(kw)
                         }
                     }
 
-                    val learnedDistraction = mutableListOf<String>()
                     if (parsed.has("learnedDistractionKeywords")) {
                         val arr = parsed.getJSONArray("learnedDistractionKeywords")
                         for (i in 0 until arr.length()) {
-                            val kw = arr.getString(i).trim()
-                            if (kw.isNotBlank()) learnedDistraction.add(kw)
+                            val kw = arr.getString(i).trim().lowercase()
+                            if (kw.isNotBlank() && !learnedDistraction.contains(kw)) learnedDistraction.add(kw)
                         }
                     }
 

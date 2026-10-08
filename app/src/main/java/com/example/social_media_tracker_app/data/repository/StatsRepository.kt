@@ -913,6 +913,7 @@ class StatsRepository(context: Context) {
     }
 
     fun pokePet(): Pair<String, Boolean> {
+        val current = _petState.value
         val prompts = listOf(
             "💧 Uống một ngụm nước ấm nhé!",
             "🌬️ Hít sâu 3 nhịp và thả lỏng vai nào!",
@@ -920,9 +921,12 @@ class StatsRepository(context: Context) {
             "👀 Nhìn xa thư giãn mắt một chút nào!",
             "🧘 Ngồi thẳng lưng lên bạn nhé!"
         )
-        val message = prompts.random()
+        val message = when {
+            current.isWilted -> "Mầm xanh đang bị úa do đứt chuỗi... Hãy hoàn thành 1 phiên Pomodoro hoặc cho tớ 1 hạt mầm để hồi sinh nhé! 🍂"
+            current.customQuotes.isNotEmpty() && (current.mood == "sad" || Math.random() < 0.7) -> current.customQuotes.random()
+            else -> prompts.random()
+        }
         val now = System.currentTimeMillis()
-        val current = _petState.value
         val cooldownMs = 30 * 60 * 1000L
 
         return if (now - current.lastPokeEnergyTime >= cooldownMs) {
@@ -936,6 +940,44 @@ class StatsRepository(context: Context) {
             Pair(message, true)
         } else {
             Pair(message, false)
+        }
+    }
+
+    fun updateFullPetState(newState: PetState) {
+        savePetState(newState)
+        checkStreakUnlocks()
+    }
+
+    fun addKnowledgeSeed() {
+        val current = _petState.value
+        val updated = current.copy(knowledgeSeeds = current.knowledgeSeeds + 1)
+        savePetState(updated)
+    }
+
+    fun feedPetSeed(): Boolean {
+        val current = _petState.value
+        if (current.knowledgeSeeds <= 0) return false
+        val newEnergy = minOf(100, current.energy + 15)
+        val updated = current.copy(
+            knowledgeSeeds = current.knowledgeSeeds - 1,
+            energy = newEnergy,
+            mood = PetState.calculateMood(newEnergy),
+            isWilted = false
+        )
+        savePetState(updated)
+        return true
+    }
+
+    fun updateCustomQuotes(quotes: List<String>) {
+        val current = _petState.value
+        val updated = current.copy(customQuotes = quotes)
+        savePetState(updated)
+    }
+
+    fun revivePetFromWilt() {
+        val current = _petState.value
+        if (current.isWilted) {
+            savePetState(current.copy(isWilted = false))
         }
     }
 

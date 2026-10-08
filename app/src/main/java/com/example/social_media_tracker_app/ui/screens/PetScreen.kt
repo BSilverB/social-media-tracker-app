@@ -30,6 +30,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -73,6 +75,7 @@ fun PetScreen(
     var sadPhotoPath by remember(petState.puppetPhotos.sadImage) { mutableStateOf(petState.puppetPhotos.sadImage) }
 
     var activePhotoSlot by remember { mutableStateOf<String?>(null) }
+    var newCustomQuote by remember { mutableStateOf("") }
 
     val puppetPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -133,19 +136,49 @@ fun PetScreen(
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x26FBBF24))
-                    .border(1.dp, Color(0x66FBBF24), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = "🔥 ${petState.streakDays} Ngày",
-                    color = Color(0xFFFBBF24),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val stageText = when {
+                    petState.isWilted -> "🍂 Héo rũ"
+                    petState.computedEvolutionStage == "flowering" -> "🌸 Nở hoa"
+                    petState.computedEvolutionStage == "growing" -> "🌿 Chồi non"
+                    else -> "🌱 Mầm non"
+                }
+                val stageColor = when {
+                    petState.isWilted -> Color(0xFFD97706)
+                    petState.computedEvolutionStage == "flowering" -> Color(0xFFFBBF24)
+                    petState.computedEvolutionStage == "growing" -> Color(0xFF10B981)
+                    else -> Color(0xFF38BDF8)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(stageColor.copy(alpha = 0.15f))
+                        .border(1.dp, stageColor.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = stageText,
+                        color = stageColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0x26FBBF24))
+                        .border(1.dp, Color(0x66FBBF24), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "🔥 ${petState.streakDays} Ngày",
+                        color = Color(0xFFFBBF24),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
@@ -273,6 +306,89 @@ fun PetScreen(
                     ) {
                         Text(text = "🧘 Thở 12s Cùng Pet", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ─── Kho Hạt Giống Tri Thức (Knowledge Seeds & Feeding) ───
+        Text(
+            text = "🌱 KHO HẠT GIỐNG TRI THỨC",
+            color = Color(0xFFA78BFA),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0x1F161E2E))
+                .border(1.dp, Color(0x3310B981), RoundedCornerShape(18.dp))
+                .padding(14.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Hạt mầm tri thức tích lũy",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Xem video học tập ≥80% hoặc nộp phản tư 22h00",
+                            color = Color(0xFF94A3B8),
+                            fontSize = 10.5.sp
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0x2210B981))
+                            .border(1.dp, Color(0x6610B981), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "🌰 ${petState.knowledgeSeeds}",
+                            color = Color(0xFF34D399),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        val success = repository.feedPetSeed()
+                        val msg = if (success) "🌱 Đã cho Pet ăn hạt mầm (+15⚡ & Hồi sinh)!" else "Chưa có hạt mầm để cho ăn!"
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    },
+                    enabled = petState.knowledgeSeeds > 0,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF10B981),
+                        disabledContainerColor = Color(0x22FFFFFF),
+                        disabledContentColor = Color(0xFF64748B)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (petState.knowledgeSeeds > 0)
+                            "🌱 Cho Pet ăn hạt mầm (+15⚡ & Hồi sinh)"
+                        else
+                            "Chưa có hạt mầm để cho ăn",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -520,6 +636,173 @@ fun PetScreen(
                                 text = "Tự động đổi trạng thái khuôn mặt động theo năng lượng thực tế.",
                                 color = Color(0xFF94A3B8),
                                 fontSize = 10.5.sp,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ─── Lời Thoại Người Thương & Mục Tiêu Lớn ───
+        Text(
+            text = "💖 LỜI THOẠI NGƯỜI THƯƠNG & MỤC TIÊU LỚN",
+            color = Color(0xFFA78BFA),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0x1F161E2E))
+                .border(1.dp, Color(0x33EC4899), RoundedCornerShape(18.dp))
+                .padding(14.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Cài sẵn 3-5 câu động lực từ người bạn yêu thương hoặc mục tiêu lớn. Pet sẽ ưu tiên nhắc câu này khi bạn chạm vào hoặc khi năng lượng thấp:",
+                    color = Color(0xFFCBD5E1),
+                    fontSize = 11.sp
+                )
+
+                if (petState.customQuotes.isEmpty()) {
+                    Text(
+                        text = "Chưa có lời nhắc riêng. Hãy thêm câu bên dưới nhé!",
+                        color = Color(0xFF64748B),
+                        fontSize = 11.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    )
+                } else {
+                    petState.customQuotes.forEachIndexed { index, quote ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(Color(0x1AFFFFFF))
+                                .border(1.dp, Color(0x22FFFFFF), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "💬 \"$quote\"",
+                                color = Color.White,
+                                fontSize = 11.5.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "✕",
+                                color = Color(0xFFEF4444),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier
+                                    .clickable {
+                                        val updated = petState.customQuotes.toMutableList()
+                                        if (index in updated.indices) {
+                                            updated.removeAt(index)
+                                            repository.updateCustomQuotes(updated)
+                                            Toast.makeText(context, "Đã xóa câu thoại!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    .padding(start = 8.dp, end = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (petState.customQuotes.size < 5) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = newCustomQuote,
+                            onValueChange = { newCustomQuote = it },
+                            placeholder = { Text("Nhập lời động lực...", fontSize = 11.sp, color = Color(0xFF64748B)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = Color(0xFF8B5CF6),
+                                unfocusedBorderColor = Color(0x33FFFFFF)
+                            )
+                        )
+
+                        Button(
+                            onClick = {
+                                val trimmed = newCustomQuote.trim()
+                                if (trimmed.isNotBlank()) {
+                                    val updated = petState.customQuotes.toMutableList()
+                                    updated.add(trimmed)
+                                    repository.updateCustomQuotes(updated)
+                                    newCustomQuote = ""
+                                    Toast.makeText(context, "Đã thêm câu động lực!", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = newCustomQuote.trim().isNotBlank(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6))
+                        ) {
+                            Text(text = "Thêm", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Đã đạt tối đa 5 câu thoại động lực.",
+                        color = Color(0xFFFBBF24),
+                        fontSize = 10.5.sp
+                    )
+                }
+
+                // Preset Pills
+                Text(
+                    text = "Gợi ý mẫu (bấm để thêm nhanh):",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val presets = listOf(
+                        "Anh hứa hôm nay code xong cơ mà!",
+                        "Cố lên, người ta đang đợi anh đấy!",
+                        "Tương lai do bạn quyết định!"
+                    )
+                    presets.forEach { preset ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0x1A8B5CF6))
+                                .border(1.dp, Color(0x338B5CF6), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    if (petState.customQuotes.size < 5 && !petState.customQuotes.contains(preset)) {
+                                        val updated = petState.customQuotes.toMutableList()
+                                        updated.add(preset)
+                                        repository.updateCustomQuotes(updated)
+                                        Toast.makeText(context, "Đã thêm mẫu!", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .padding(horizontal = 6.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = preset,
+                                color = Color(0xFFC4B5FD),
+                                fontSize = 9.5.sp,
+                                maxLines = 2,
                                 textAlign = TextAlign.Center
                             )
                         }

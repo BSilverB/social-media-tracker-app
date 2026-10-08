@@ -180,6 +180,39 @@ class FirebaseSyncManager(
                         }
                     }
 
+                    // 2.5. Đọc petState chuyên sâu (đồng bộ 2 chiều với Chrome Extension)
+                    if (snapshot.hasChild("petState")) {
+                        val pSnap = snapshot.child("petState")
+                        val currentPet = statsRepository.petState.value
+                        val pEnergy = pSnap.child("energy").getValue(Int::class.java) ?: currentPet.energy
+                        val pMood = pSnap.child("mood").getValue(String::class.java) ?: currentPet.mood
+                        val pStreak = pSnap.child("currentStreak").getValue(Int::class.java)
+                            ?: pSnap.child("streakDays").getValue(Int::class.java) ?: currentPet.streakDays
+                        val pSeeds = pSnap.child("knowledgeSeeds").getValue(Int::class.java) ?: currentPet.knowledgeSeeds
+                        val pWilted = pSnap.child("isWilted").getValue(Boolean::class.java) ?: currentPet.isWilted
+                        val pStage = pSnap.child("evolutionStage").getValue(String::class.java) ?: currentPet.evolutionStage
+                        val quotesList = mutableListOf<String>()
+                        if (pSnap.hasChild("customQuotes")) {
+                            for (child in pSnap.child("customQuotes").children) {
+                                child.getValue(String::class.java)?.let { quotesList.add(it) }
+                            }
+                        } else {
+                            quotesList.addAll(currentPet.customQuotes)
+                        }
+
+                        val updatedPet = currentPet.copy(
+                            energy = pEnergy,
+                            mood = pMood,
+                            currentStreak = pStreak,
+                            streakDays = pStreak,
+                            knowledgeSeeds = pSeeds,
+                            isWilted = pWilted,
+                            evolutionStage = pStage,
+                            customQuotes = quotesList
+                        )
+                        statsRepository.updateFullPetState(updatedPet)
+                    }
+
                     // 3. Đọc config từ cloud nếu có cập nhật mới
                     if (snapshot.hasChild("config")) {
                         val cSnap = snapshot.child("config")
@@ -447,51 +480,117 @@ class FirebaseSyncManager(
 
     /**
      * Đẩy cấu hình lên Firebase ngay lập tức khi người dùng lưu cài đặt trong App
+     * Áp dụng Read-Latest-Cloud & Deep Merge cho keywords để không ghi đè làm mất từ khóa mà Extension vừa thêm.
      */
     fun pushConfigImmediately(appConfig: AppConfig = statsRepository.appConfig.value) {
         if (currentSyncCode.isBlank()) return
         try {
-            val configRef = db.getReference("users/$currentSyncCode/config")
-            val safeConfig = mapOf(
-                "syncCode" to appConfig.syncCode,
-                "masterGoal" to appConfig.masterGoal,
-                "leisureQuotaMinutes" to appConfig.leisureQuotaMinutes,
-                "thresholds" to mapOf(
-                    "youtube" to mapOf(
-                        "shorts" to mapOf("m1" to appConfig.thresholds.youtube.shorts.m1, "m2" to appConfig.thresholds.youtube.shorts.m2, "m3" to appConfig.thresholds.youtube.shorts.m3),
-                        "long" to mapOf("m1" to appConfig.thresholds.youtube.long.m1, "m2" to appConfig.thresholds.youtube.long.m2, "m3" to appConfig.thresholds.youtube.long.m3)
-                    ),
-                    "facebook" to mapOf(
-                        "reels" to mapOf("m1" to appConfig.thresholds.facebook.reels.m1, "m2" to appConfig.thresholds.facebook.reels.m2, "m3" to appConfig.thresholds.facebook.reels.m3),
-                        "feeds" to mapOf("m1" to appConfig.thresholds.facebook.feeds.m1, "m2" to appConfig.thresholds.facebook.feeds.m2, "m3" to appConfig.thresholds.facebook.feeds.m3),
-                        "long" to mapOf("m1" to appConfig.thresholds.facebook.long.m1, "m2" to appConfig.thresholds.facebook.long.m2, "m3" to appConfig.thresholds.facebook.long.m3)
-                    ),
-                    "tiktok" to mapOf(
-                        "shorts" to mapOf("m1" to appConfig.thresholds.tiktok.shorts.m1, "m2" to appConfig.thresholds.tiktok.shorts.m2, "m3" to appConfig.thresholds.tiktok.shorts.m3)
+            val keywordsRef = db.getReference("users/$currentSyncCode/config/keywords")
+            keywordsRef.get().addOnSuccessListener { snapshot ->
+                val cloudTarget = snapshot.child("target").children.mapNotNull { it.getValue(String::class.java)?.trim()?.lowercase() }
+                val cloudLeisure = snapshot.child("leisure").children.mapNotNull { it.getValue(String::class.java)?.trim()?.lowercase() }
+                val cloudDistraction = snapshot.child("distraction").children.mapNotNull { it.getValue(String::class.java)?.trim()?.lowercase() }
+
+                val mergedTarget = (cloudTarget + appConfig.targetKeywords.map { it.trim().lowercase() }).filter { it.isNotBlank() }.distinct()
+                val mergedLeisure = (cloudLeisure + appConfig.leisureKeywords.map { it.trim().lowercase() }).filter { it.isNotBlank() }.distinct()
+                val mergedDistraction = (cloudDistraction + appConfig.distractionKeywords.map { it.trim().lowercase() }).filter { it.isNotBlank() }.distinct()
+
+                // Nếu Cloud có từ mới mà local app chưa có, đồng bộ lại vào repository
+                if (mergedTarget != appConfig.targetKeywords || mergedLeisure != appConfig.leisureKeywords || mergedDistraction != appConfig.distractionKeywords) {
+                    statsRepository.updateConfig(
+                        appConfig.copy(
+                            targetKeywords = mergedTarget,
+                            leisureKeywords = mergedLeisure,
+                            distractionKeywords = mergedDistraction
+                        ),
+                        fromRemote = true
                     )
-                ),
-                "pomodoro" to mapOf(
-                    "enabled" to appConfig.pomodoro.enabled,
-                    "focusMinutes" to appConfig.pomodoro.focusMinutes,
-                    "breakMinutes" to appConfig.pomodoro.breakMinutes
-                ),
-                "bedtime" to mapOf(
-                    "enabled" to appConfig.bedtime.enabled,
-                    "start" to appConfig.bedtime.start,
-                    "end" to appConfig.bedtime.end
-                ),
-                "reflection" to mapOf(
-                    "reminderTime" to appConfig.reflection.reminderTime
-                ),
-                "keywords" to mapOf(
-                    "target" to appConfig.targetKeywords,
-                    "leisure" to appConfig.leisureKeywords,
-                    "distraction" to appConfig.distractionKeywords
-                ),
-                "lastUpdated" to System.currentTimeMillis()
-            )
-            configRef.setValue(safeConfig)
-            Log.d(TAG, "🟢 Đã đẩy cấu hình cập nhật tức thì lên cloud: users/$currentSyncCode/config")
+                }
+
+                val configRef = db.getReference("users/$currentSyncCode/config")
+                val safeConfig = mapOf(
+                    "syncCode" to appConfig.syncCode,
+                    "masterGoal" to appConfig.masterGoal,
+                    "leisureQuotaMinutes" to appConfig.leisureQuotaMinutes,
+                    "thresholds" to mapOf(
+                        "youtube" to mapOf(
+                            "shorts" to mapOf("m1" to appConfig.thresholds.youtube.shorts.m1, "m2" to appConfig.thresholds.youtube.shorts.m2, "m3" to appConfig.thresholds.youtube.shorts.m3),
+                            "long" to mapOf("m1" to appConfig.thresholds.youtube.long.m1, "m2" to appConfig.thresholds.youtube.long.m2, "m3" to appConfig.thresholds.youtube.long.m3)
+                        ),
+                        "facebook" to mapOf(
+                            "reels" to mapOf("m1" to appConfig.thresholds.facebook.reels.m1, "m2" to appConfig.thresholds.facebook.reels.m2, "m3" to appConfig.thresholds.facebook.reels.m3),
+                            "feeds" to mapOf("m1" to appConfig.thresholds.facebook.feeds.m1, "m2" to appConfig.thresholds.facebook.feeds.m2, "m3" to appConfig.thresholds.facebook.feeds.m3),
+                            "long" to mapOf("m1" to appConfig.thresholds.facebook.long.m1, "m2" to appConfig.thresholds.facebook.long.m2, "m3" to appConfig.thresholds.facebook.long.m3)
+                        ),
+                        "tiktok" to mapOf(
+                            "shorts" to mapOf("m1" to appConfig.thresholds.tiktok.shorts.m1, "m2" to appConfig.thresholds.tiktok.shorts.m2, "m3" to appConfig.thresholds.tiktok.shorts.m3)
+                        )
+                    ),
+                    "pomodoro" to mapOf(
+                        "enabled" to appConfig.pomodoro.enabled,
+                        "focusMinutes" to appConfig.pomodoro.focusMinutes,
+                        "breakMinutes" to appConfig.pomodoro.breakMinutes
+                    ),
+                    "bedtime" to mapOf(
+                        "enabled" to appConfig.bedtime.enabled,
+                        "start" to appConfig.bedtime.start,
+                        "end" to appConfig.bedtime.end
+                    ),
+                    "reflection" to mapOf(
+                        "reminderTime" to appConfig.reflection.reminderTime
+                    ),
+                    "keywords" to mapOf(
+                        "target" to mergedTarget,
+                        "leisure" to mergedLeisure,
+                        "distraction" to mergedDistraction
+                    ),
+                    "lastUpdated" to System.currentTimeMillis()
+                )
+                configRef.setValue(safeConfig)
+                Log.d(TAG, "🟢 Đã Deep Merge và đẩy config cập nhật tức thì lên cloud: users/$currentSyncCode/config")
+            }.addOnFailureListener { err ->
+                Log.w(TAG, "Lỗi đọc cloud keywords trước khi merge, fallback đẩy trực tiếp: ${err.message}")
+                val configRef = db.getReference("users/$currentSyncCode/config")
+                val fallbackConfig = mapOf(
+                    "syncCode" to appConfig.syncCode,
+                    "masterGoal" to appConfig.masterGoal,
+                    "leisureQuotaMinutes" to appConfig.leisureQuotaMinutes,
+                    "thresholds" to mapOf(
+                        "youtube" to mapOf(
+                            "shorts" to mapOf("m1" to appConfig.thresholds.youtube.shorts.m1, "m2" to appConfig.thresholds.youtube.shorts.m2, "m3" to appConfig.thresholds.youtube.shorts.m3),
+                            "long" to mapOf("m1" to appConfig.thresholds.youtube.long.m1, "m2" to appConfig.thresholds.youtube.long.m2, "m3" to appConfig.thresholds.youtube.long.m3)
+                        ),
+                        "facebook" to mapOf(
+                            "reels" to mapOf("m1" to appConfig.thresholds.facebook.reels.m1, "m2" to appConfig.thresholds.facebook.reels.m2, "m3" to appConfig.thresholds.facebook.reels.m3),
+                            "feeds" to mapOf("m1" to appConfig.thresholds.facebook.feeds.m1, "m2" to appConfig.thresholds.facebook.feeds.m2, "m3" to appConfig.thresholds.facebook.feeds.m3),
+                            "long" to mapOf("m1" to appConfig.thresholds.facebook.long.m1, "m2" to appConfig.thresholds.facebook.long.m2, "m3" to appConfig.thresholds.facebook.long.m3)
+                        ),
+                        "tiktok" to mapOf(
+                            "shorts" to mapOf("m1" to appConfig.thresholds.tiktok.shorts.m1, "m2" to appConfig.thresholds.tiktok.shorts.m2, "m3" to appConfig.thresholds.tiktok.shorts.m3)
+                        )
+                    ),
+                    "pomodoro" to mapOf(
+                        "enabled" to appConfig.pomodoro.enabled,
+                        "focusMinutes" to appConfig.pomodoro.focusMinutes,
+                        "breakMinutes" to appConfig.pomodoro.breakMinutes
+                    ),
+                    "bedtime" to mapOf(
+                        "enabled" to appConfig.bedtime.enabled,
+                        "start" to appConfig.bedtime.start,
+                        "end" to appConfig.bedtime.end
+                    ),
+                    "reflection" to mapOf(
+                        "reminderTime" to appConfig.reflection.reminderTime
+                    ),
+                    "keywords" to mapOf(
+                        "target" to appConfig.targetKeywords,
+                        "leisure" to appConfig.leisureKeywords,
+                        "distraction" to appConfig.distractionKeywords
+                    ),
+                    "lastUpdated" to System.currentTimeMillis()
+                )
+                configRef.setValue(fallbackConfig)
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Lỗi đẩy config tức thì lên cloud: ${e.message}")
         }
@@ -522,6 +621,10 @@ class FirebaseSyncManager(
                 "streakDays" to petState.streakDays,
                 "lastPokeEnergyTime" to petState.lastPokeEnergyTime,
                 "mode" to petState.mode,
+                "knowledgeSeeds" to petState.knowledgeSeeds,
+                "customQuotes" to petState.customQuotes,
+                "isWilted" to petState.isWilted,
+                "evolutionStage" to petState.evolutionStage,
                 "accessories" to mapOf(
                     "unlockedItems" to petState.accessories.unlockedItems,
                     "equippedHead" to petState.accessories.equippedHead

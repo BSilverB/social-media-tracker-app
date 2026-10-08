@@ -253,6 +253,7 @@ fun MindfulAppRoot(
             masterGoal = appConfig.masterGoal,
             currentSwipes = stats.totalSwipes,
             threshold = appConfig.thresholds.m3,
+            petState = petState,
             onDismiss = { showBreathingOverlay = false },
             onCloseApp = { showBreathingOverlay = false },
             onResistTemptation = { repository.recordTemptation(true) },
