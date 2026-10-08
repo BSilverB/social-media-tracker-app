@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.social_media_tracker_app.data.model.PetState
 import com.example.social_media_tracker_app.data.model.PuppetPhotos
+import com.example.social_media_tracker_app.data.repository.FirebaseSyncManager
 import com.example.social_media_tracker_app.data.repository.StatsRepository
 import com.example.social_media_tracker_app.ui.pet.PetWidget
 import java.io.File
@@ -62,6 +63,7 @@ import java.io.FileOutputStream
 @Composable
 fun PetScreen(
     repository: StatsRepository,
+    syncManager: FirebaseSyncManager? = null,
     onTriggerBreathing: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -288,6 +290,9 @@ fun PetScreen(
                     Button(
                         onClick = {
                             val (msg, energyGained) = repository.pokePet()
+                            if (energyGained) {
+                                syncManager?.pushPetStateImmediately(repository.petState.value)
+                            }
                             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         },
                         shape = RoundedCornerShape(12.dp),
@@ -370,6 +375,9 @@ fun PetScreen(
                     onClick = {
                         val success = repository.feedPetSeed()
                         val msg = if (success) "🌱 Đã cho Pet ăn hạt mầm (+15⚡ & Hồi sinh)!" else "Chưa có hạt mầm để cho ăn!"
+                        if (success) {
+                            syncManager?.pushPetStateImmediately(repository.petState.value)
+                        }
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     },
                     enabled = petState.knowledgeSeeds > 0,
@@ -707,6 +715,7 @@ fun PetScreen(
                                         if (index in updated.indices) {
                                             updated.removeAt(index)
                                             repository.updateCustomQuotes(updated)
+                                            syncManager?.pushPetStateImmediately(repository.petState.value)
                                             Toast.makeText(context, "Đã xóa câu thoại!", Toast.LENGTH_SHORT).show()
                                         }
                                     }
@@ -744,6 +753,7 @@ fun PetScreen(
                                     val updated = petState.customQuotes.toMutableList()
                                     updated.add(trimmed)
                                     repository.updateCustomQuotes(updated)
+                                    syncManager?.pushPetStateImmediately(repository.petState.value)
                                     newCustomQuote = ""
                                     Toast.makeText(context, "Đã thêm câu động lực!", Toast.LENGTH_SHORT).show()
                                 }
@@ -792,6 +802,7 @@ fun PetScreen(
                                         val updated = petState.customQuotes.toMutableList()
                                         updated.add(preset)
                                         repository.updateCustomQuotes(updated)
+                                        syncManager?.pushPetStateImmediately(repository.petState.value)
                                         Toast.makeText(context, "Đã thêm mẫu!", Toast.LENGTH_SHORT).show()
                                     }
                                 }

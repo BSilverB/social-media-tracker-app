@@ -208,6 +208,7 @@ fun MindfulAppRoot(
                 AppTab.PET -> {
                     PetScreen(
                         repository = repository,
+                        syncManager = syncManager,
                         onTriggerBreathing = { showBreathingOverlay = true }
                     )
                 }

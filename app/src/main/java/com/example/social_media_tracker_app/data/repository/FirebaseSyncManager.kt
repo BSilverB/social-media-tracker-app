@@ -597,6 +597,36 @@ class FirebaseSyncManager(
     }
 
     /**
+     * Đẩy tức thì trạng thái Pet (năng lượng, hạt giống, câu thoại, héo rũ, tiến hóa) lên Firebase
+     */
+    fun pushPetStateImmediately(petState: PetState) {
+        if (currentSyncCode.isBlank()) return
+        try {
+            val petRef = db.getReference("users/$currentSyncCode/petState")
+            val petPayload = mapOf(
+                "energy" to petState.energy,
+                "mood" to petState.mood,
+                "currentStreak" to petState.currentStreak,
+                "streakDays" to petState.streakDays,
+                "lastPokeEnergyTime" to petState.lastPokeEnergyTime,
+                "mode" to petState.mode,
+                "knowledgeSeeds" to petState.knowledgeSeeds,
+                "customQuotes" to petState.customQuotes,
+                "isWilted" to petState.isWilted,
+                "evolutionStage" to petState.evolutionStage,
+                "accessories" to mapOf(
+                    "unlockedItems" to petState.accessories.unlockedItems,
+                    "equippedHead" to petState.accessories.equippedHead
+                )
+            )
+            petRef.updateChildren(petPayload)
+            Log.d(TAG, "🟢 Đã đồng bộ tức thì petState lên Firebase: users/$currentSyncCode/petState")
+        } catch (e: Exception) {
+            Log.w(TAG, "Lỗi đồng bộ tức thì petState: ${e.message}")
+        }
+    }
+
+    /**
      * Khi App bị pause hoặc đưa xuống nền (onStop / onPause)
      */
     fun onAppExitOrBackground(petState: PetState) {
